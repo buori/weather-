@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>동탄 날씨</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f0f4f8;
+      color: #333;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    .weather-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 10px auto;
+      width: 300px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .weather-img {
+      width: 100px;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="page-title">동탄 날씨</h1>
+  <div id="weather-container"></div>
+
+  <script>
+    const serviceKey = "당신의_기상청_API_서비스키"; // 여기에 본인의 인증키를 입력하세요
+
+    function formatDate(date) {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      return `${yyyy}${mm}${dd}`;
+    }
+
+    function getBaseTime() {
+      const now = new Date();
+      const hour = now.getHours();
+      if (hour < 2) return "2300";
+      if (hour < 5) return "0200";
+      if (hour < 8) return "0500";
+      if (hour < 11) return "0800";
+      if (hour < 14) return "1100";
+      if (hour < 17) return "1400";
+      if (hour < 20) return "1700";
+      if (hour < 23) return "2000";
+      return "2300";
+    }
+
+    function getDatesToFetch() {
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      return [
+        { label: "오늘", date: today },
+        { label: "내일", date: tomorrow },
+      ];
+    }
+
+    function skyText(sky, pty) {
+      if (pty === "1") return "비";
+      if (pty === "2") return "비/눈";
+      if (pty === "3") return "눈";
+      if (pty === "4") return "소나기";
+      if (sky === "1") return "맑음";
+      if (sky === "3" || sky === "4") return "흐림";
+      return "알 수 없음";
+    }
+
+    function getWeatherImage(sky, pty) {
+      if (pty === "1" || pty === "2" || pty === "4") return "rain.png";
+      if (pty === "3") return "snow.png";
+      if (sky === "1") return "sunny.png";
+      if (sky === "3" || sky === "4") return "cloudy.png";
+      return "unknown.png";
+    }
+
+    async function fetchWeather() {
+      const baseDate = formatDate(new Date());
+      const baseTime = getBaseTime();
+      const nx = 60, ny = 120; // 동탄 좌표
+
+      const url = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?serviceKey=${serviceKey}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=${nx}&ny=${ny}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      const items = json.response.body.items.item;
+
+      const container = document.getElementById("weather-container");
+      container.innerHTML = "";
+
+      const days = getDatesToFetch();
+
+      for (const day of days) {
+        const dateStr = formatDate(day.date);
+        const dailyItems = items.filter(i => i.fcstDate === dateStr && i.fcstTime === "1500");
+
+        const tmp = dailyItems.find(i => i.category === "TMP");
+        const sky = dailyItems.find(i => i.category === "SKY");
+        const pty = dailyItems.find(i => i.category === "PTY");
+        const reh = dailyItems.find(i => i.category === "REH");
+        const wsd = dailyItems.find(i => i.category === "WSD");
+
+        const weatherImg = getWeatherImage(sky?.fcstValue, pty?.fcstValue);
+        const weatherText = skyText(sky?.fcstValue, pty?.fcstValue);
+
+        const box = document.createElement("div");
+        box.className = "weather-box";
+
+        box.innerHTML = `
+          <h2>${day.label} (${dateStr})</h2>
+          <img src="images/${weatherImg}" alt="날씨 이미지" class="weather-img">
+          <p>기온: ${tmp?.fcstValue ?? "정보 없음"}℃</p>
+          <p>날씨: ${weatherText}</p>
+          <p>습도: ${reh?.fcstValue ?? "정보 없음"}%</p>
+          <p>풍속: ${wsd?.fcstValue ?? "정보 없음"} m/s</p>
+        `;
+
+        container.appendChild(box);
+      }
+    }
+
+    function setTitleWithDate() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const formattedDate = `${yyyy}-${mm}-${dd}`;
+      document.getElementById("page-title").textContent = `${formattedDate}의 동탄 날씨`;
+    }
+
+    setTitleWithDate();
+    fetchWeather();
+  </script>
+</body>
+</html>
